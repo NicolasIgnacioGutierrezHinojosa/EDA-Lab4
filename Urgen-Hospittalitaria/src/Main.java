@@ -40,3 +40,24 @@ public class Main {
 
     }
 }
+class AreaAtencion{
+    private String NombreDelArea;
+    private PriorityQueue<Paciente> pacientesHeap;
+    private int capacidadMaxima;
+}
+    void ingresarPaciente(Paciente P){
+        
+    }
+    Paciente atenderPaciente(){
+    }
+
+    boolean estaSaturada(){
+        
+    }
+    List<Paciente>obtenerPacientesporHeapSport(){
+        
+    }
+class Hospital{
+    private 
+
+    
