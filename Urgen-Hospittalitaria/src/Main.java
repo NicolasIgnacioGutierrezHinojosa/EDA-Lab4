@@ -19,8 +19,20 @@ public class Main {
             this.categoria = categoria;
             this.tiempoLlegada = tiempoLlegada;
             this.estado = "en_espera";
-
             this.historialCambios = null;
+        }
+        
+        Long tiempoEsperaActual(){
+            Long tiempoActual = LocalTime.now().toNanoOfDay();
+            return tiempoActual - tiempoLlegada;
+        }
+
+        void registrarCambio(String descripcion){
+            historialCambios.push(descripcion);
+        }
+
+        String obtenerUltimoCambio(){
+            return historialCambios.pop();
         }
 
     }
