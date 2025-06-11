@@ -99,8 +99,15 @@ class Hospital {
 
     public Hospital() {
         colaAtencion = new PriorityQueue<>((p1, p2) -> {
-            if (p1.categoria != p2.categoria)
-                return Integer.compare(p1.categoria, p2.categoria);
+            long ahora = System.currentTimeMillis();
+            long espera1 = (ahora - p1.tiempoLlegada) / 60000;
+            long espera2 = (ahora - p2.tiempoLlegada) / 60000;
+
+            int prioridad1 = p1.categoria - (espera1 > 180 ? 1 : 0);
+            int prioridad2 = p2.categoria - (espera2 > 180 ? 1 : 0);
+
+            if (prioridad1 != prioridad2)
+                return Integer.compare(prioridad1, prioridad2);
             return Long.compare(p1.tiempoLlegada, p2.tiempoLlegada);
         });
     }
@@ -189,7 +196,6 @@ class Hospital {
         }
     }
 }
-
 class GeneradorPacientes {
     static final String[] NOMBRES = {"Juan", "Maria", "Pedro", "Ana", "Luis", "Camila", "Jose"};
     static final String[] APELLIDOS = {"Gomez", "Lopez", "Martinez", "Fernandez", "Perez", "Diaz"};
@@ -260,7 +266,7 @@ class SimuladorUrgencia {
 
         hospital.mostrarEstadisticas();
 
-        // Ejemplo: seguimiento de un paciente C4
+        
         for (Paciente p : pacientes) {
             if (p.categoria == 4) {
                 hospital.seguimientoPaciente(p.id);
@@ -270,7 +276,7 @@ class SimuladorUrgencia {
     }
 }
 
- class HospitalUrgencySimulation {
+class HospitalUrgencySimulation {
     public static void main(String[] args) {
         Hospital hospital = new Hospital();
         hospital.agregarArea(new AreaAtencion("SAPU", 100));
@@ -284,3 +290,4 @@ class SimuladorUrgencia {
         hospital.reasignarCategoria("PAC5", 1);
     }
 }
+
