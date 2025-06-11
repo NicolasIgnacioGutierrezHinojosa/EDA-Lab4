@@ -1,15 +1,14 @@
+import java.io.*;
 import java.util.*;
 
 // Clase Paciente
 class Paciente {
-    String nombre;
-    String apellido;
-    String id;
-    int categoria; // 1 a 5
-    long tiempoLlegada; // Unix timestamp en milisegundos
-    String estado; // en_espera, en_atencion, atendido
-    String area; // SAPU, urgencia_adulto, urgencia_infantil
+    String nombre, apellido, id;
+    int categoria;
+    long tiempoLlegada;
+    String estado, area;
     Stack<String> historialCambios;
+    long tiempoAtencion;
 
     public Paciente(String nombre, String apellido, String id, int categoria, long tiempoLlegada) {
         this.nombre = nombre;
@@ -20,11 +19,11 @@ class Paciente {
         this.estado = "en_espera";
         this.area = asignarAreaAtencion();
         this.historialCambios = new Stack<>();
+        this.tiempoAtencion = -1;
     }
 
-    // Devuelve el tiempo de espera actual en minutos basado en un tiempo simulado
     public long tiempoEsperaActual(long tiempoActual) {
-        return (tiempoActual - tiempoLlegada) / 60000; // milisegundos a minutos
+        return (tiempoActual - tiempoLlegada) / 60000;
     }
 
     public void registrarCambio(String descripcion) {
@@ -36,29 +35,20 @@ class Paciente {
     }
 
     private String asignarAreaAtencion() {
-        // Asignar área según categoría
-        switch (categoria) {
-            case 1:
-            case 2:
-                return "urgencia_adulto";
-            case 3:
-            case 4:
-                return "SAPU";
-            case 5:
-                return "urgencia_infantil";
-            default:
-                return "SAPU";
-        }
+        return switch (categoria) {
+            case 1, 2 -> "urgencia_adulto";
+            case 3, 4 -> "SAPU";
+            case 5 -> "urgencia_infantil";
+            default -> "SAPU";
+        };
     }
 
     @Override
     public String toString() {
-        return String.format("Paciente[%s %s, ID: %s, Cat: C%d, Estado: %s, Área: %s, Llegada: %d]",
-                nombre, apellido, id, categoria, estado, area, tiempoLlegada);
+        return String.format("%s %s;%s;C%d;%s;%s;%d", nombre, apellido, id, categoria, estado, area, tiempoLlegada);
     }
 }
 
-// Clase AreaAtencion
 class AreaAtencion {
     String nombre;
     PriorityQueue<Paciente> pacientesHeap;
@@ -67,21 +57,15 @@ class AreaAtencion {
     public AreaAtencion(String nombre, int capacidadMaxima) {
         this.nombre = nombre;
         this.capacidadMaxima = capacidadMaxima;
-        this.pacientesHeap = new PriorityQueue<>(new Comparator<Paciente>() {
-            @Override
-            public int compare(Paciente p1, Paciente p2) {
-                if (p1.categoria != p2.categoria)
-                    return Integer.compare(p1.categoria, p2.categoria);
-                else
-                    return Long.compare(p1.tiempoLlegada, p2.tiempoLlegada);
-            }
+        this.pacientesHeap = new PriorityQueue<>((p1, p2) -> {
+            if (p1.categoria != p2.categoria)
+                return Integer.compare(p1.categoria, p2.categoria);
+            return Long.compare(p1.tiempoLlegada, p2.tiempoLlegada);
         });
     }
 
     public void ingresarPaciente(Paciente p) {
-        if (!estaSaturada()) {
-            pacientesHeap.offer(p);
-        }
+        if (!estaSaturada()) pacientesHeap.offer(p);
     }
 
     public Paciente atenderPaciente() {
@@ -92,58 +76,33 @@ class AreaAtencion {
         return pacientesHeap.size() >= capacidadMaxima;
     }
 
-    // Retorna pacientes ordenados por prioridad usando heapSort (simulado)
     public List<Paciente> obtenerPacientesPorHeapSort() {
         List<Paciente> lista = new ArrayList<>(pacientesHeap);
-        // Ordenar según prioridad
-        lista.sort(new Comparator<Paciente>() {
-            @Override
-            public int compare(Paciente p1, Paciente p2) {
-                if (p1.categoria != p2.categoria)
-                    return Integer.compare(p1.categoria, p2.categoria);
-                return Long.compare(p1.tiempoLlegada, p2.tiempoLlegada);
-            }
+        lista.sort((p1, p2) -> {
+            if (p1.categoria != p2.categoria)
+                return Integer.compare(p1.categoria, p2.categoria);
+            return Long.compare(p1.tiempoLlegada, p2.tiempoLlegada);
         });
         return lista;
     }
-
-    @Override
-    public String toString() {
-        return nombre + " - pacientes: " + pacientesHeap.size();
-    }
 }
 
-// Clase Hospital
 class Hospital {
-    Map<String, Paciente> pacientesTotales;
+    Map<String, Paciente> pacientesTotales = new HashMap<>();
     PriorityQueue<Paciente> colaAtencion;
-    Map<String, AreaAtencion> areasAtencion;
-    List<Paciente> pacientesAtendidos;
-
-    // Para estadísticas
-    Map<Integer, Integer> pacientesAtendidosPorCategoria;
-    Map<Integer, Long> tiempoEsperaTotalPorCategoria;
-    Map<Integer, Integer> cantidadPacientesPorCategoria;
+    Map<String, AreaAtencion> areasAtencion = new HashMap<>();
+    List<Paciente> pacientesAtendidos = new ArrayList<>();
+    Map<Integer, Integer> pacientesAtendidosPorCategoria = new HashMap<>();
+    Map<Integer, Long> tiempoEsperaTotalPorCategoria = new HashMap<>();
+    Map<Integer, Integer> cantidadPacientesPorCategoria = new HashMap<>();
+    List<Paciente> pacientesFueraDeTiempo = new ArrayList<>();
 
     public Hospital() {
-        pacientesTotales = new HashMap<>();
-
-        colaAtencion = new PriorityQueue<>(new Comparator<Paciente>() {
-            @Override
-            public int compare(Paciente p1, Paciente p2) {
-                if (p1.categoria != p2.categoria)
-                    return Integer.compare(p1.categoria, p2.categoria);
-                else
-                    return Long.compare(p1.tiempoLlegada, p2.tiempoLlegada);
-            }
+        colaAtencion = new PriorityQueue<>((p1, p2) -> {
+            if (p1.categoria != p2.categoria)
+                return Integer.compare(p1.categoria, p2.categoria);
+            return Long.compare(p1.tiempoLlegada, p2.tiempoLlegada);
         });
-
-        areasAtencion = new HashMap<>();
-        pacientesAtendidos = new ArrayList<>();
-
-        pacientesAtendidosPorCategoria = new HashMap<>();
-        tiempoEsperaTotalPorCategoria = new HashMap<>();
-        cantidadPacientesPorCategoria = new HashMap<>();
     }
 
     public void agregarArea(AreaAtencion area) {
@@ -161,116 +120,100 @@ class Hospital {
         Paciente p = pacientesTotales.get(id);
         if (p != null) {
             p.registrarCambio("Categoría cambiada de C" + p.categoria + " a C" + nuevaCategoria);
-            p.categoria = nuevaCategoria;
-            // Reinsertar paciente en colaAtencion porque prioridad cambió, así que eliminar y añadir
             colaAtencion.remove(p);
+            p.categoria = nuevaCategoria;
             colaAtencion.offer(p);
         }
     }
 
     public Paciente atenderSiguiente(long tiempoSimulado) {
-        if (colaAtencion.isEmpty())
-            return null;
-
-        Paciente pacientePrioritario = null;
-
-        // Buscar paciente que excedió tiempo maximo para atención prioritaria
+        if (colaAtencion.isEmpty()) return null;
+        Paciente paciente = null;
         for (Paciente p : colaAtencion) {
-            long tiempoEspera = p.tiempoEsperaActual(tiempoSimulado);
-            if (tiempoEspera > tiempoMaxPermitido(p.categoria)) {
-                pacientePrioritario = p;
+            if (p.tiempoEsperaActual(tiempoSimulado) > tiempoMaxPermitido(p.categoria)) {
+                paciente = p;
+                pacientesFueraDeTiempo.add(p);
                 break;
             }
         }
-        if (pacientePrioritario == null)
-            pacientePrioritario = colaAtencion.poll();
-        else
-            colaAtencion.remove(pacientePrioritario);
+        if (paciente == null) paciente = colaAtencion.poll();
+        else colaAtencion.remove(paciente);
 
-        if (pacientePrioritario != null) {
-            pacientePrioritario.estado = "en_atencion";
-            // Asignar a área y agregar en heap de área si no saturada
-            AreaAtencion area = areasAtencion.get(pacientePrioritario.area);
+        if (paciente != null) {
+            paciente.estado = "atendido";
+            paciente.tiempoAtencion = tiempoSimulado;
+            AreaAtencion area = areasAtencion.get(paciente.area);
             if (area != null && !area.estaSaturada()) {
-                area.ingresarPaciente(pacientePrioritario);
-                pacientePrioritario.estado = "atendido";
-                pacientesAtendidos.add(pacientePrioritario);
-
-                // Estadísticas
-                pacientesAtendidosPorCategoria.put(
-                        pacientePrioritario.categoria,
-                        pacientesAtendidosPorCategoria.getOrDefault(pacientePrioritario.categoria, 0) + 1);
-
-                long tiempoEspera = pacientePrioritario.tiempoEsperaActual(tiempoSimulado);
-                tiempoEsperaTotalPorCategoria.put(
-                        pacientePrioritario.categoria,
-                        tiempoEsperaTotalPorCategoria.getOrDefault(pacientePrioritario.categoria, 0L) + tiempoEspera);
+                area.ingresarPaciente(paciente);
+                pacientesAtendidos.add(paciente);
+                pacientesAtendidosPorCategoria.put(paciente.categoria,
+                        pacientesAtendidosPorCategoria.getOrDefault(paciente.categoria, 0) + 1);
+                long tiempoEspera = paciente.tiempoEsperaActual(tiempoSimulado);
+                tiempoEsperaTotalPorCategoria.put(paciente.categoria,
+                        tiempoEsperaTotalPorCategoria.getOrDefault(paciente.categoria, 0L) + tiempoEspera);
             }
         }
-        return pacientePrioritario;
+        return paciente;
     }
 
-    // Devuelve lista pacientes en espera de una categoría
-    public List<Paciente> obtenerPacientesPorCategoria(int categoria) {
-        List<Paciente> lista = new ArrayList<>();
-        for (Paciente p : colaAtencion) {
-            if (p.categoria == categoria) {
-                lista.add(p);
-            }
-        }
-        return lista;
-    }
-
-    public AreaAtencion obtenerArea(String nombre) {
-        return areasAtencion.get(nombre);
-    }
-
-    // Tiempo máximo permitido por categoría en minutos
     private long tiempoMaxPermitido(int categoria) {
-        switch (categoria) {
-            case 1: return 0; // atención inmediata
-            case 2: return 30;
-            case 3: return 90;
-            case 4: return 180;
-            case 5: return Long.MAX_VALUE; // sin límite
-            default: return Long.MAX_VALUE;
-        }
+        return switch (categoria) {
+            case 1 -> 0;
+            case 2 -> 30;
+            case 3 -> 90;
+            case 4 -> 180;
+            case 5 -> Long.MAX_VALUE;
+            default -> Long.MAX_VALUE;
+        };
     }
 
-    // Estadísticas para reporte
     public void mostrarEstadisticas() {
-        System.out.println("Estadísticas de atención:");
-        int totalAtendidos = pacientesAtendidos.size();
-        System.out.println("Total pacientes atendidos: " + totalAtendidos);
+        System.out.println("\n--- ESTADÍSTICAS ---");
+        System.out.println("Total pacientes atendidos: " + pacientesAtendidos.size());
         for (int c = 1; c <= 5; c++) {
             int atendidos = pacientesAtendidosPorCategoria.getOrDefault(c, 0);
             long totalEspera = tiempoEsperaTotalPorCategoria.getOrDefault(c, 0L);
-            int cantidad = cantidadPacientesPorCategoria.getOrDefault(c, 0);
             double promedio = atendidos > 0 ? ((double) totalEspera / atendidos) : 0;
-            System.out.printf("Categoría C%d - Atendidos: %d, Espera promedio: %.2f minutos, Ingresados totales: %d\n",
-                    c, atendidos, promedio, cantidad);
+            int total = cantidadPacientesPorCategoria.getOrDefault(c, 0);
+            System.out.printf("C%d - Atendidos: %d, Promedio espera: %.2f min, Total registrados: %d\n",
+                    c, atendidos, promedio, total);
+        }
+        System.out.println("Pacientes que excedieron el tiempo máximo: " + pacientesFueraDeTiempo.size());
+    }
+
+    public void seguimientoPaciente(String id) {
+        Paciente p = pacientesTotales.get(id);
+        if (p != null && p.tiempoAtencion != -1) {
+            long espera = (p.tiempoAtencion - p.tiempoLlegada) / 60000;
+            System.out.println("Paciente " + p.nombre + " " + p.apellido + " (" + p.id + ") fue atendido en " + espera + " minutos.");
         }
     }
 }
 
-// Clase GeneradorPacientes
 class GeneradorPacientes {
-    private static final String[] NOMBRES = {"Juan", "Maria", "Pedro", "Ana", "Luis", "Camila", "Jose"};
-    private static final String[] APELLIDOS = {"Gomez", "Lopez", "Martinez", "Fernandez", "Perez", "Diaz"};
-    private static int idCounter = 1;
-    private static Random random = new Random();
+    static final String[] NOMBRES = {"Juan", "Maria", "Pedro", "Ana", "Luis", "Camila", "Jose"};
+    static final String[] APELLIDOS = {"Gomez", "Lopez", "Martinez", "Fernandez", "Perez", "Diaz"};
+    static int idCounter = 1;
+    static Random random = new Random();
 
-    public static List<Paciente> generarPacientes(int n, long timestampInicio) {
-        List<Paciente> pacientes = new ArrayList<>();
-        for (int i = 0; i < n; i++) {
-            String nombre = NOMBRES[random.nextInt(NOMBRES.length)];
-            String apellido = APELLIDOS[random.nextInt(APELLIDOS.length)];
-            String id = "PAC" + (idCounter++);
-            int categoria = generarCategoria();
-            long tiempoLlegada = timestampInicio + i * 600000; // cada 10 minutos en milisegundos
-            pacientes.add(new Paciente(nombre, apellido, id, categoria, tiempoLlegada));
+    public static List<Paciente> generarPacientes(int n, long inicio) {
+        List<Paciente> lista = new ArrayList<>();
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter("Pacientes_24h.txt"))) {
+            for (int i = 0; i < n; i++) {
+                String nombre = NOMBRES[random.nextInt(NOMBRES.length)];
+                String apellido = APELLIDOS[random.nextInt(APELLIDOS.length)];
+                String id = "PAC" + (idCounter++);
+                int categoria = generarCategoria();
+                long llegada = inicio + i * 600000;
+                Paciente p = new Paciente(nombre, apellido, id, categoria, llegada);
+                lista.add(p);
+                bw.write(p.toString());
+                bw.newLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        return pacientes;
+        return lista;
     }
 
     private static int generarCategoria() {
@@ -283,56 +226,51 @@ class GeneradorPacientes {
     }
 }
 
-// Clase SimuladorUrgencia
 class SimuladorUrgencia {
     private Hospital hospital;
-    private List<Paciente> pacientesGenerados;
-    private int indicePacienteNuevo;
-    private long tiempoInicioSimulacion;
+    private List<Paciente> pacientes;
+    private int indice;
+    private long inicio;
 
     public SimuladorUrgencia(Hospital hospital) {
         this.hospital = hospital;
-        this.indicePacienteNuevo = 0;
-        this.tiempoInicioSimulacion = System.currentTimeMillis();
+        this.indice = 0;
+        this.inicio = System.currentTimeMillis();
     }
 
-    public void simular(int pacientesPorDia) {
-        pacientesGenerados = GeneradorPacientes.generarPacientes(pacientesPorDia, tiempoInicioSimulacion);
+    public void simular(int cantidad) {
+        pacientes = GeneradorPacientes.generarPacientes(cantidad, inicio);
+        int acumulado = 0;
 
-        int nuevosIngresosAcumulados = 0;
-
-        // Simulación minuto a minuto por 24 horas (1440 minutos)
         for (int minuto = 0; minuto < 1440; minuto++) {
-            long tiempoSimulado = tiempoInicioSimulacion + minuto * 60000L; // minuto en ms
-
-            // Cada 10 minutos llega un paciente
-            if (minuto % 10 == 0 && indicePacienteNuevo < pacientesGenerados.size()) {
-                Paciente nuevo = pacientesGenerados.get(indicePacienteNuevo++);
-                hospital.registrarPaciente(nuevo);
-                nuevosIngresosAcumulados++;
+            long tiempoSim = inicio + minuto * 60000L;
+            if (minuto % 10 == 0 && indice < pacientes.size()) {
+                hospital.registrarPaciente(pacientes.get(indice++));
+                acumulado++;
             }
-
-            // Cada 15 minutos se atiende un paciente
             if (minuto % 15 == 0) {
-                hospital.atenderSiguiente(tiempoSimulado);
-                // Reset acumulado para el caso especial de 3 ingresos -> 2 atenciones
-                if (nuevosIngresosAcumulados >= 3) {
-                    // Se atienden 2 pacientes adicionales inmediatamente en teria aunque no se si esta bine segun el lab 
-                    hospital.atenderSiguiente(tiempoSimulado);
-                    hospital.atenderSiguiente(tiempoSimulado);
-                    nuevosIngresosAcumulados = 0;
+                hospital.atenderSiguiente(tiempoSim);
+                if (acumulado >= 3) {
+                    hospital.atenderSiguiente(tiempoSim);
+                    hospital.atenderSiguiente(tiempoSim);
+                    acumulado = 0;
                 }
             }
-
-            
         }
 
         hospital.mostrarEstadisticas();
+
+        // Ejemplo: seguimiento de un paciente C4
+        for (Paciente p : pacientes) {
+            if (p.categoria == 4) {
+                hospital.seguimientoPaciente(p.id);
+                break;
+            }
+        }
     }
 }
 
-
-    class HospitalUrgencySimulation {
+ class HospitalUrgencySimulation {
     public static void main(String[] args) {
         Hospital hospital = new Hospital();
         hospital.agregarArea(new AreaAtencion("SAPU", 100));
@@ -340,11 +278,9 @@ class SimuladorUrgencia {
         hospital.agregarArea(new AreaAtencion("urgencia_infantil", 100));
 
         SimuladorUrgencia simulador = new SimuladorUrgencia(hospital);
-        simulador.simular(200); // Simulación con 200 pacientes en 24h
+        simulador.simular(200);
 
-        // Se pueden agregar pruebas específicas o no se en este punto estoy al borde de la locura sjsjsjsjjss
-        // List<Paciente> c4Pacientes = hospital.obtenerPacientesPorCategoria(4); 
-        // System.out.println("Pacientes C4 en espera: " + c4Pacientes.size());
+        // Simula cambio de categoría
+        hospital.reasignarCategoria("PAC5", 1);
     }
 }
-
